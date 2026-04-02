@@ -10,6 +10,11 @@ import passport from '../auth/passport.js';
 import authRoutes from '../auth/routes.js';
 import { db } from '../db/index.js';
 import { setupYjsWebSocket } from '../ws.js';
+import documentRoutes from './routes/documents.js';
+
+
+// ❌ REMOVE THIS LINE:
+// import { documents } from '../db/documents.ts';
 
 dotenv.config();
 
@@ -42,7 +47,7 @@ app.use(
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+      maxAge: 1000 * 60 * 60 * 24 * 7,
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     },
   })
@@ -54,11 +59,13 @@ app.use(passport.session());
 
 // Routes
 app.use('/auth', authRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Get current user
 app.get('/api/me', (req, res) => {
   if (req.isAuthenticated() && req.user) {
-    res.json(req.user);
+    const { id, email, name, avatar } = req.user as any;
+    res.json({ id, email, name, avatar });
   } else {
     res.status(401).json({ message: 'Unauthorized' });
   }
@@ -68,7 +75,6 @@ app.get('/api/me', (req, res) => {
 const wss = new WebSocketServer({ noServer: true });
 
 server.on('upgrade', (request, socket, head) => {
-  // Extract session from cookie
   const cookie = request.headers.cookie || '';
   const match = cookie.match(/connect\.sid=([^;]+)/);
   
@@ -85,7 +91,6 @@ server.on('upgrade', (request, socket, head) => {
       return;
     }
 
-    // Attach user to request for WebSocket
     (request as any).user = sessionData.passport.user;
     
     wss.handleUpgrade(request, socket, head, (ws) => {
